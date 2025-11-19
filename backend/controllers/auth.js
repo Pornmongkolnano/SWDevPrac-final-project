@@ -7,9 +7,9 @@ const sanitize = require('mongo-sanitize');
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, telephone, email, password, role } = req.body;
     //Create user
-    const user = await User.create({ name, email, password, role });
+    const user = await User.create({ name, telephone, email, password, role });
 
     // const token = user.getSignedJwtToken();
     // res.status(200).json({ success: true, token });
@@ -82,6 +82,7 @@ const sendTokenResponse = (user, statusCode, res) => {
     success: true,
     _id: user._id,
     name: user.name,
+    telephone: user.telephone,
     email: user.email,
     token,
   });

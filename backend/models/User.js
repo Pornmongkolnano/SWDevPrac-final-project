@@ -7,6 +7,11 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: [true, "Please add a name"],
   },
+  telephone: {
+    type: String,
+    required: [true, "Please add a telephone number"],
+    match: [/^\d{1,10}$/, "Telephone number must not exceed 10 digits"],
+  },
   email: {
     type: String,
     required: [true, "Please add an email"],
