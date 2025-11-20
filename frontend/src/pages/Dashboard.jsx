@@ -18,28 +18,26 @@ const Dashboard = () => {
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarMode, setSidebarMode] = useState('reserves');
 
+  // --- EDITING STATE (NEW) ---
+  const [editingReservationId, setEditingReservationId] = useState(null);
+  const [editDate, setEditDate] = useState(""); 
+
   // --- 1. FETCH DATA ON LOAD ---
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Fetch Spaces
         const spacesRes = await api.get('/coworking-spaces');
         setSpaces(spacesRes.data.data);
-
-        // 2. Fetch Reservations
         await fetchReservations();
-        
         setLoading(false);
       } catch (err) {
         console.error("Error fetching data:", err);
         setLoading(false);
       }
     };
-
     if (user) fetchData();
   }, [user]);
 
-  // Helper to refresh reservations list
   const fetchReservations = async () => {
     try {
       const res = await api.get('/reservations');
@@ -59,7 +57,6 @@ const Dashboard = () => {
     }
   };
 
-  // CREATE RESERVATION
   const handleReserve = async (space) => {
     const spaceId = space._id || space.id;
     const dateInput = document.getElementById(`date-${spaceId}`).value;
@@ -67,52 +64,56 @@ const Dashboard = () => {
     if (!dateInput) return alert("Please select a date first.");
 
     try {
-      // Call API: POST /coworking-spaces/:id/reservations
       await api.post(`/coworking-spaces/${spaceId}/reservations`, {
         reservationDate: dateInput
       });
-
-      // Refresh List
       await fetchReservations();
-      
-      // Open Sidebar
       if (!showSidebar || sidebarMode !== 'reserves') {
         setShowSidebar(true);
         setSidebarMode('reserves');
       }
       alert("Reservation successful!");
-
     } catch (err) {
-      // Handle "Limit reached" or other errors
       const msg = err.response?.data?.message || "Reservation failed";
       alert(msg);
     }
   };
 
-  // DELETE RESERVATION
   const handleDelete = async (id) => {
     if (confirm("Are you sure you want to delete this reservation?")) {
       try {
         await api.delete(`/reservations/${id}`);
-        await fetchReservations(); // Refresh list
+        await fetchReservations();
       } catch (err) {
         alert(err.response?.data?.message || "Delete failed");
       }
     }
   };
 
-  // EDIT RESERVATION
-  const handleEdit = async (id) => {
-    const newDate = prompt("Enter new date (YYYY-MM-DD):");
-    if (newDate) {
-      try {
+  // --- NEW EDIT HANDLERS (No more prompt!) ---
+  
+  const startEdit = (reservation) => {
+    setEditingReservationId(reservation._id);
+    // Convert ISO date to YYYY-MM-DD for the input
+    const currentDate = reservation.reservationDate ? reservation.reservationDate.split('T')[0] : '';
+    setEditDate(currentDate);
+  };
+
+  const cancelEdit = () => {
+    setEditingReservationId(null);
+    setEditDate("");
+  };
+
+  const saveEdit = async (id) => {
+    if (!editDate) return alert("Please select a date");
+    try {
         await api.put(`/reservations/${id}`, {
-            reservationDate: newDate
+            reservationDate: editDate
         });
-        await fetchReservations(); // Refresh list
-      } catch (err) {
+        await fetchReservations(); // Refresh data
+        setEditingReservationId(null); // Exit edit mode
+    } catch (err) {
         alert(err.response?.data?.message || "Update failed");
-      }
     }
   };
 
@@ -123,11 +124,7 @@ const Dashboard = () => {
 
   // --- RENDER HELPERS ---
   const displayedSpaces = selectedSpace ? [selectedSpace] : spaces;
-  
-  // Since API returns all my reservations, we just use that array.
-  // For Admin, the API returns ALL reservations.
   const myReservations = reservations; 
-
   const myFavoriteSpaces = spaces.filter(space => favorites.includes(space._id || space.id));
 
   return (
@@ -143,7 +140,6 @@ const Dashboard = () => {
       <div className="dashboard-container">
         {/* LEFT PANEL: MAIN CONTENT */}
         <div className="main-panel">
-            
             {/* USER: SPACE LIST */}
             {user.role !== 'admin' && (
                 <>
@@ -191,19 +187,36 @@ const Dashboard = () => {
                             {reservations.map(res => (
                                 <tr key={res._id} style={{borderBottom: '1px solid #eee'}}>
                                 <td style={{padding: 10, fontSize:'0.85rem', color:'#666'}}>
-                                    {/* Note: Backend doesn't populate User Name yet, so we show ID */}
                                     {res.user}
                                 </td>
                                 <td style={{padding: 10}}>
                                     {res.coworkingSpace ? res.coworkingSpace.name : 'Unknown Space'}
                                 </td>
                                 <td style={{padding: 10}}>
-                                    {/* Format Date: YYYY-MM-DD */}
-                                    {res.reservationDate ? res.reservationDate.split('T')[0] : 'N/A'}
+                                    {/* TOGGLE BETWEEN VIEW AND EDIT MODE */}
+                                    {editingReservationId === res._id ? (
+                                        <input 
+                                            type="date" 
+                                            value={editDate}
+                                            onChange={(e) => setEditDate(e.target.value)}
+                                            style={{padding: '5px'}}
+                                        />
+                                    ) : (
+                                        res.reservationDate ? res.reservationDate.split('T')[0] : 'N/A'
+                                    )}
                                 </td>
                                 <td style={{padding: 10}}>
-                                    <button onClick={() => handleEdit(res._id)} style={{marginRight:10}}>✏️</button>
-                                    <button onClick={() => handleDelete(res._id)}>🗑️</button>
+                                    {editingReservationId === res._id ? (
+                                        <>
+                                            <button onClick={() => saveEdit(res._id)} style={{marginRight:10, background:'none', border:'none', cursor:'pointer'}}>✅</button>
+                                            <button onClick={cancelEdit} style={{background:'none', border:'none', cursor:'pointer'}}>❌</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => startEdit(res)} style={{marginRight:10, background:'none', border:'none', cursor:'pointer'}}>✏️</button>
+                                            <button onClick={() => handleDelete(res._id)} style={{background:'none', border:'none', cursor:'pointer'}}>🗑️</button>
+                                        </>
+                                    )}
                                 </td>
                                 </tr>
                             ))}
@@ -230,18 +243,40 @@ const Dashboard = () => {
                     
                     {reservations.map(res => (
                     <div key={res._id} className="mini-card" style={{cursor: 'default'}}>
-                        <div>
-                        <strong>
-                            {res.coworkingSpace ? res.coworkingSpace.name : "Loading..."}
-                        </strong>
-                        <div style={{fontSize: '0.9rem', marginTop: 4}}>
-                            {/* Format Date: YYYY-MM-DD */}
-                            {res.reservationDate ? res.reservationDate.split('T')[0] : ''}
+                        <div style={{width: '100%'}}>
+                            <strong>
+                                {res.coworkingSpace ? res.coworkingSpace.name : "Loading..."}
+                            </strong>
+                            
+                            {/* TOGGLE BETWEEN VIEW AND EDIT MODE */}
+                            {editingReservationId === res._id ? (
+                                <div style={{marginTop: 5, display:'flex', alignItems:'center', gap: 5}}>
+                                    <input 
+                                        type="date" 
+                                        value={editDate}
+                                        onChange={(e) => setEditDate(e.target.value)}
+                                        style={{padding: '4px', borderRadius: '4px', border: '1px solid #ccc', width: '100%'}}
+                                    />
+                                </div>
+                            ) : (
+                                <div style={{fontSize: '0.9rem', marginTop: 4}}>
+                                    {res.reservationDate ? res.reservationDate.split('T')[0] : ''}
+                                </div>
+                            )}
                         </div>
-                        </div>
-                        <div style={{display:'flex', gap:5}}>
-                            <button className="icon-btn" onClick={() => handleEdit(res._id)}>✏️</button>
-                            <button className="icon-btn" onClick={() => handleDelete(res._id)} style={{color: '#ef4444'}}>🗑️</button>
+
+                        <div style={{display:'flex', gap:2, marginLeft: 10}}>
+                             {editingReservationId === res._id ? (
+                                <>
+                                    <button className="icon-btn" onClick={() => saveEdit(res._id)} title="Save">✅</button>
+                                    <button className="icon-btn" onClick={cancelEdit} title="Cancel">❌</button>
+                                </>
+                             ) : (
+                                <>
+                                    <button className="icon-btn" onClick={() => startEdit(res)} title="Edit">✏️</button>
+                                    <button className="icon-btn" onClick={() => handleDelete(res._id)} style={{color: '#ef4444'}} title="Delete">🗑️</button>
+                                </>
+                             )}
                         </div>
                     </div>
                     ))}
