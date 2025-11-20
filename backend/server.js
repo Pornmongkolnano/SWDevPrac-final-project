@@ -16,8 +16,8 @@ dotenv.config({ path: "./config/config.env" });
 connectDB();
 
 //Route files
-const hospitals = require("./routes/hospitals");
-const appointments = require("./routes/appointments");
+const coworkingSpaces = require("./routes/coworkingSpaces");
+const reservations = require("./routes/reservations");
 const auth = require("./routes/auth");
 
 const app = express();
@@ -27,9 +27,9 @@ const swaggerOptions = {
   swaggerDefinition: {
     openapi: "3.0.0",
     info: {
-      title: "Library API",
+      title: "Co-working Reservation API",
       version: "1.0.0",
-      description: "A simple Express VacQ API",
+      description: "An API for managing co-working spaces and reservations",
     },
     servers: [
       {
@@ -59,8 +59,8 @@ app.use(xss());
 //Prevent http param pollutions
 app.use(hpp());
 //Mount routers
-app.use("/api/v1/hospitals", hospitals);
-app.use("/api/v1/appointments", appointments);
+app.use("/api/v1/coworking-spaces", coworkingSpaces);
+app.use("/api/v1/reservations", reservations);
 app.use("/api/v1/auth", auth);
 app.use(cookieParser());
 
