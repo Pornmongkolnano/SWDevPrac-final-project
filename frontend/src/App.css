@@ -14,6 +14,7 @@
   --primary: #6366f1;         /* Indigo button */
   --primary-hover: #4f46e5;
   --danger: #ef4444;          /* Red delete/logout button */
+  --fav-color: #ec4899;       /* Pink for Favorites */
   --navbar-bg: #ffffff;       /* White Navbar */
   
   --border-color: #cbd5e1;
@@ -92,12 +93,11 @@ button { font-family: inherit; }
   font-weight: bold;
 }
 
-/* --- NEW LOGOUT BUTTON STYLE --- */
 .btn-logout {
   padding: 8px 16px;
   background-color: white;
-  color: var(--danger); /* Red Text */
-  border: 1px solid var(--danger); /* Red Border */
+  color: var(--danger); 
+  border: 1px solid var(--danger);
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
@@ -126,9 +126,9 @@ button { font-family: inherit; }
 }
 
 .nav-brand { font-size: 1.2rem; font-weight: bold; color: var(--primary); }
-.nav-controls { display: flex; align-items: center; gap: 20px; }
+.nav-controls { display: flex; align-items: center; gap: 15px; }
 
-/* The Toggle Button in the Bar */
+/* Standard Toggle Button */
 .toggle-btn {
   padding: 8px 16px;
   background-color: var(--text-main);
@@ -140,8 +140,23 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 8px;
+  transition: opacity 0.2s;
 }
 .toggle-btn:hover { opacity: 0.9; }
+
+/* Heart Button in Navbar */
+.nav-heart-btn {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: var(--fav-color);
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  transition: transform 0.2s;
+}
+.nav-heart-btn:hover { transform: scale(1.1); }
 
 /* --- DASHBOARD LAYOUT --- */
 .dashboard-container {
@@ -159,6 +174,23 @@ button { font-family: inherit; }
   background-color: var(--bg-pastel);
 }
 
+/* Back Button Logic */
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-weight: bold;
+  padding: 0;
+}
+.btn-back:hover { text-decoration: underline; }
+
+/* WIDE CARD */
 .wide-card {
   display: flex;
   justify-content: space-between;
@@ -174,6 +206,20 @@ button { font-family: inherit; }
 .wide-card-info h3 { color: var(--primary); margin-bottom: 8px; }
 .wide-card-info p { margin: 4px 0; color: var(--text-body); font-weight: 500; }
 
+/* Card Fav Button Styling for inline placement */
+.card-fav-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem; 
+  cursor: pointer;
+  color: #cbd5e1; 
+  transition: color 0.2s, transform 0.2s;
+  margin-left: 10px; 
+}
+.card-fav-btn.active { color: var(--fav-color); } 
+.card-fav-btn:hover { transform: scale(1.2); }
+
+/* SIDEBAR */
 .sidebar-panel {
   width: var(--sidebar-width);
   background-color: var(--sidebar-bg);
@@ -187,6 +233,7 @@ button { font-family: inherit; }
 .sidebar-panel.closed { width: 0; border: none; padding: 0; }
 .sidebar-content { padding: 20px; width: var(--sidebar-width); }
 
+/* Mini Card - Now Clickable */
 .mini-card {
   background: white;
   border: 1px solid var(--border-color);
@@ -197,6 +244,12 @@ button { font-family: inherit; }
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  cursor: pointer; /* Shows it is clickable */
+  transition: transform 0.1s, border-color 0.2s;
+}
+.mini-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
 }
 
 .mini-card strong { color: var(--text-main); }

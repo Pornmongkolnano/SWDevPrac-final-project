@@ -13,8 +13,15 @@ function App() {
   const [view, setView] = useState('login');
   const [user, setUser] = useState(null);
   const [reservations, setReservations] = useState([]);
+  const [favorites, setFavorites] = useState([]); 
   const [formData, setFormData] = useState({ email: '', password: '', name: '', tel: '' });
+  
+  // New State for "Space Detail Page"
+  const [selectedSpace, setSelectedSpace] = useState(null); 
+
+  // Sidebar Controls
   const [showSidebar, setShowSidebar] = useState(true);
+  const [sidebarMode, setSidebarMode] = useState('reserves'); 
 
   // --- HANDLERS ---
   const handleLogin = () => {
@@ -26,7 +33,18 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     setView('login');
+    setFavorites([]); 
+    setSelectedSpace(null); // Reset selection
     setFormData({ email: '', password: '', name: '', tel: '' });
+  };
+
+  const handleToggleSidebar = (mode) => {
+    if (showSidebar && sidebarMode === mode) {
+      setShowSidebar(false);
+    } else {
+      setShowSidebar(true);
+      setSidebarMode(mode);
+    }
   };
 
   const handleReserve = (space) => {
@@ -44,7 +62,11 @@ function App() {
     };
     setReservations([...reservations, newRes]);
     
-    if (!showSidebar) setShowSidebar(true);
+    // Switch sidebar to reserves to show success
+    if (!showSidebar || sidebarMode !== 'reserves') {
+      setShowSidebar(true);
+      setSidebarMode('reserves');
+    }
   };
 
   const handleDelete = (id) => {
@@ -60,6 +82,19 @@ function App() {
     }
   };
 
+  const toggleFavorite = (id) => {
+    if (favorites.includes(id)) {
+      setFavorites(favorites.filter(favId => favId !== id));
+    } else {
+      setFavorites([...favorites, id]);
+    }
+  };
+
+  // Go to specific space page
+  const handleGoToSpace = (space) => {
+    setSelectedSpace(space);
+  };
+
   // --- VIEW 1: LOGIN / REGISTER ---
   if (view === 'login' || view === 'register') {
     return (
@@ -68,14 +103,12 @@ function App() {
           <h2 style={{textAlign:'center', marginBottom: 10}}>
             {view === 'login' ? 'Login' : 'Register'}
           </h2>
-          
           {view === 'register' && (
             <>
               <input className="auth-input" placeholder="Name" onChange={e => setFormData({...formData, name: e.target.value})} />
               <input className="auth-input" placeholder="Telephone" onChange={e => setFormData({...formData, tel: e.target.value})} />
             </>
           )}
-          
           <input className="auth-input" type="email" placeholder="Email" onChange={e => setFormData({...formData, email: e.target.value})} />
           <input className="auth-input" type="password" placeholder="Password" onChange={e => setFormData({...formData, password: e.target.value})} />
 
@@ -97,103 +130,161 @@ function App() {
 
   // --- VIEW 2: DASHBOARD ---
   const myReservations = reservations.filter(r => r.userEmail === user.email);
+  const myFavoriteSpaces = MOCK_SPACES.filter(space => favorites.includes(space.id));
+
+  // Determine which spaces to show in main panel
+  // If selectedSpace is active, show ONLY that one. Otherwise show ALL.
+  const displayedSpaces = selectedSpace ? [selectedSpace] : MOCK_SPACES;
 
   return (
     <div>
-      {/* TOP NAVIGATION BAR */}
       <div className="top-navbar">
-        <div className="nav-brand">Co-Working Space</div>
+        <div className="nav-brand" onClick={() => setSelectedSpace(null)} style={{cursor:'pointer'}}>
+          Co-Working Space
+        </div>
         <div className="nav-controls">
           <span>Hi, {user.name || user.email}</span>
-          
-          {/* TOGGLE BUTTON IN BAR */}
-          <button className="toggle-btn" onClick={() => setShowSidebar(!showSidebar)}>
-            {showSidebar ? 'Hide Reserves' : 'Show Reserves'}
+          <button className="nav-heart-btn" onClick={() => handleToggleSidebar('favorites')} title="Show Favorites">
+            {sidebarMode === 'favorites' && showSidebar ? '❤️' : '🤍'}
           </button>
-          
-          {/* UPDATED LOGOUT BUTTON */}
-          <button className="btn-logout" onClick={handleLogout}>
-            Logout
+          <button className="toggle-btn" onClick={() => handleToggleSidebar('reserves')}
+            style={{ background: sidebarMode === 'reserves' && showSidebar ? '#334155' : '#1e293b' }}>
+            {sidebarMode === 'reserves' && showSidebar ? 'Hide Reserves' : 'Show Reserves'}
           </button>
+          <button className="btn-logout" onClick={handleLogout}>Logout</button>
         </div>
       </div>
 
       <div className="dashboard-container">
         {/* LEFT PANEL */}
         <div className="main-panel">
-          <h2 style={{marginBottom: 20}}>
-            {user.role === 'admin' ? "Admin Dashboard" : "Available Spaces"}
-          </h2>
-
           {user.role === 'admin' ? (
-            /* ADMIN TABLE */
-            <div style={{background: 'white', padding: 20, borderRadius: 8, border: '1px solid #cbd5e1'}}>
-              <table style={{width: '100%', borderCollapse: 'collapse'}}>
-                <thead>
-                  <tr style={{textAlign:'left', borderBottom: '2px solid #eee'}}>
-                    <th style={{padding: 10}}>User</th>
-                    <th style={{padding: 10}}>Space</th>
-                    <th style={{padding: 10}}>Date</th>
-                    <th style={{padding: 10}}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservations.map(res => (
-                    <tr key={res.id} style={{borderBottom: '1px solid #eee'}}>
-                      <td style={{padding: 10}}>{res.userEmail}</td>
-                      <td style={{padding: 10}}>{res.spaceName}</td>
-                      <td style={{padding: 10}}>{res.date}</td>
-                      <td style={{padding: 10}}>
-                        <button onClick={() => handleEdit(res.id)} style={{marginRight:10}}>✏️</button>
-                        <button onClick={() => handleDelete(res.id)}>🗑️</button>
-                      </td>
+            // ADMIN VIEW
+            <>
+              <h2 style={{marginBottom: 20}}>Admin Dashboard</h2>
+              <div style={{background: 'white', padding: 20, borderRadius: 8, border: '1px solid #cbd5e1'}}>
+                <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                  <thead>
+                    <tr style={{textAlign:'left', borderBottom: '2px solid #eee'}}>
+                      <th style={{padding: 10}}>User</th><th>Space</th><th>Date</th><th>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {reservations.map(res => (
+                      <tr key={res.id} style={{borderBottom: '1px solid #eee'}}>
+                        <td style={{padding: 10}}>{res.userEmail}</td>
+                        <td style={{padding: 10}}>{res.spaceName}</td>
+                        <td style={{padding: 10}}>{res.date}</td>
+                        <td style={{padding: 10}}>
+                          <button onClick={() => handleEdit(res.id)} style={{marginRight:10}}>✏️</button>
+                          <button onClick={() => handleDelete(res.id)}>🗑️</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
-            /* USER LIST */
-            <div>
-              {MOCK_SPACES.map(space => (
-                <div key={space.id} className="wide-card">
-                  <div className="wide-card-info">
-                    <h3>{space.name}</h3>
-                    <p>📍 {space.address}</p>
-                    <p>📞 {space.tel}</p>
-                    <p>⏰ {space.open}</p>
+            // USER VIEW
+            <>
+              <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 20}}>
+                <h2>{selectedSpace ? "Reserve Space" : "Available Spaces"}</h2>
+                {selectedSpace && (
+                  <button className="btn-back" onClick={() => setSelectedSpace(null)}>
+                    ← Back to All Spaces
+                  </button>
+                )}
+              </div>
+
+              <div>
+                {displayedSpaces.map(space => (
+                  <div key={space.id} className="wide-card">
+                    <div className="wide-card-info">
+                      <h3>{space.name}</h3>
+                      <p>📍 {space.address}</p>
+                      <p>📞 {space.tel}</p>
+                      <p>⏰ {space.open}</p>
+                    </div>
+                    <div style={{display:'flex', flexDirection:'column', gap:10}}>
+                      <div style={{display:'flex', alignItems:'center'}}>
+                        <input type="date" id={`date-${space.id}`} style={{flex:1, padding: 8, border:'1px solid #ccc', borderRadius:4}} />
+                        <button 
+                          className={`card-fav-btn ${favorites.includes(space.id) ? 'active' : ''}`}
+                          onClick={() => toggleFavorite(space.id)}
+                          title="Add to Favorites"
+                        >
+                          {favorites.includes(space.id) ? '❤️' : '🤍'}
+                        </button>
+                      </div>
+                      <button className="btn-primary" onClick={() => handleReserve(space)}>Reserve</button>
+                    </div>
                   </div>
-                  <div style={{display:'flex', flexDirection:'column', gap:10}}>
-                    <input type="date" id={`date-${space.id}`} style={{padding: 8, border:'1px solid #ccc', borderRadius:4}} />
-                    <button className="btn-primary" onClick={() => handleReserve(space)}>Reserve</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
 
         {/* RIGHT PANEL (SIDEBAR) */}
         <div className={`sidebar-panel ${showSidebar ? '' : 'closed'}`}>
           <div className="sidebar-content">
-            <h3 style={{borderBottom:'1px solid #ccc', paddingBottom:10, marginBottom:15}}>
-              My Reserves ({myReservations.length}/3)
-            </h3>
             
-            {myReservations.length === 0 && <p>No bookings yet.</p>}
+            {/* RESERVATIONS LIST */}
+            {sidebarMode === 'reserves' && (
+              <>
+                <h3 style={{borderBottom:'1px solid #ccc', paddingBottom:10, marginBottom:15}}>
+                  My Reserves ({myReservations.length}/3)
+                </h3>
+                {myReservations.length === 0 && <p>No bookings yet.</p>}
+                {myReservations.map(res => (
+                  <div key={res.id} className="mini-card" style={{cursor: 'default'}}> {/* Reserve cards not clickable for navigation */}
+                    <div>
+                      <strong>{res.spaceName}</strong>
+                      <div style={{fontSize: '0.9rem', marginTop: 4}}>{res.date}</div>
+                    </div>
+                    <div style={{display:'flex', gap:5}}>
+                      <button className="icon-btn" onClick={() => handleEdit(res.id)}>✏️</button>
+                      <button className="icon-btn" onClick={() => handleDelete(res.id)} style={{color: '#ef4444'}}>🗑️</button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
 
-            {myReservations.map(res => (
-              <div key={res.id} className="mini-card">
-                <div>
-                  <strong>{res.spaceName}</strong>
-                  <div style={{fontSize: '0.9rem', marginTop: 4}}>{res.date}</div>
-                </div>
-                <div style={{display:'flex', gap:5}}>
-                  <button className="icon-btn" onClick={() => handleEdit(res.id)} title="Edit">✏️</button>
-                  <button className="icon-btn" onClick={() => handleDelete(res.id)} title="Delete" style={{color: '#ef4444'}}>🗑️</button>
-                </div>
-              </div>
-            ))}
+            {/* FAVORITES LIST - CLICKABLE */}
+            {sidebarMode === 'favorites' && (
+              <>
+                <h3 style={{borderBottom:'1px solid #ccc', paddingBottom:10, marginBottom:15, color: '#ec4899'}}>
+                  My Favorites ({favorites.length})
+                </h3>
+                {favorites.length === 0 && <p>No favorites added yet.</p>}
+                {myFavoriteSpaces.map(space => (
+                  <div 
+                    key={space.id} 
+                    className="mini-card"
+                    onClick={() => handleGoToSpace(space)} /* CLICK TO GO TO PAGE */
+                    title="Click to Reserve"
+                  >
+                    <div>
+                      <strong>{space.name}</strong>
+                      <div style={{fontSize: '0.85rem', color: '#666', marginTop:2}}>{space.address}</div>
+                    </div>
+                    <div style={{display:'flex', gap:5}}>
+                      <button 
+                         className="icon-btn" 
+                         title="Remove Favorite"
+                         onClick={(e) => { e.stopPropagation(); toggleFavorite(space.id); }} /* Stop prop so we don't navigate when deleting */
+                         style={{fontSize: '1rem'}}
+                      >
+                        ❌
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
           </div>
         </div>
       </div>
