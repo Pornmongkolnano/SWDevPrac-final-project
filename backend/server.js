@@ -19,6 +19,7 @@ connectDB();
 const coworkingSpaces = require("./routes/coworkingSpaces");
 const reservations = require("./routes/reservations");
 const auth = require("./routes/auth");
+const favorites = require('./routes/favorites');
 
 const app = express();
 app.set("query parser", "extended");
@@ -62,6 +63,7 @@ app.use(hpp());
 app.use("/api/v1/coworking-spaces", coworkingSpaces);
 app.use("/api/v1/reservations", reservations);
 app.use("/api/v1/auth", auth);
+app.use('/api/v1/favorites', favorites);
 app.use(cookieParser());
 
 const PORT = process.env.PORT || 5003;
