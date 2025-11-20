@@ -1,24 +1,37 @@
-import { useState, useContext } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import AuthContext from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import SpaceCard from '../components/SpaceCard';
-
-// Mock Data for Spaces (Since you haven't built the Spaces API yet)
-const MOCK_SPACES = [
-  { id: 1, name: "The Hive", address: "123 Main St", tel: "02-111-1111", open: "08:00 - 20:00" },
-  { id: 2, name: "WorkLoft", address: "456 Silom Rd", tel: "02-222-2222", open: "24 Hours" },
-  { id: 3, name: "DraftBoard", address: "789 Sukhumvit", tel: "02-333-3333", open: "09:00 - 18:00" },
-];
+import api from '../api/axios'; // Import your API helper
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
   
-  // Local State for Dashboard Logic
+  // --- STATE ---
+  const [spaces, setSpaces] = useState([]); // Store fetched spaces here
+  const [loadingSpaces, setLoadingSpaces] = useState(true);
   const [reservations, setReservations] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [selectedSpace, setSelectedSpace] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarMode, setSidebarMode] = useState('reserves');
+
+  // --- 1. FETCH SPACES ON LOAD ---
+  useEffect(() => {
+    const fetchSpaces = async () => {
+      try {
+        // Call GET /api/v1/coworking-spaces
+        const res = await api.get('/coworking-spaces');
+        setSpaces(res.data.data); // Backend returns { success: true, data: [...] }
+        setLoadingSpaces(false);
+      } catch (err) {
+        console.error("Error fetching spaces:", err);
+        setLoadingSpaces(false);
+      }
+    };
+
+    fetchSpaces();
+  }, []);
 
   // --- HANDLERS ---
   const handleToggleSidebar = (mode) => {
@@ -31,16 +44,18 @@ const Dashboard = () => {
   };
 
   const handleReserve = (space) => {
-    const dateInput = document.getElementById(`date-${space.id}`).value;
+    // Handle MongoDB _id vs Mock id
+    const spaceId = space._id || space.id;
+    const dateInput = document.getElementById(`date-${spaceId}`).value;
+    
     if (!dateInput) return alert("Please select a date first.");
     
-    // NOTE: In future, replace this with api.post('/reservations')
     if (reservations.filter(r => r.userEmail === user.email).length >= 3) {
         return alert("Limit reached: 3 slots.");
     }
 
     const newRes = {
-      id: Date.now(),
+      id: Date.now(), // Temporary ID for frontend state
       userEmail: user.email,
       spaceName: space.name,
       date: dateInput
@@ -59,9 +74,11 @@ const Dashboard = () => {
   };
 
   // --- RENDER HELPERS ---
-  const displayedSpaces = selectedSpace ? [selectedSpace] : MOCK_SPACES;
+  const displayedSpaces = selectedSpace ? [selectedSpace] : spaces;
   const myReservations = reservations.filter(r => r.userEmail === user.email);
-  const myFavoriteSpaces = MOCK_SPACES.filter(space => favorites.includes(space.id));
+  
+  // Filter favorites from the real 'spaces' array
+  const myFavoriteSpaces = spaces.filter(space => favorites.includes(space._id || space.id));
 
   return (
     <div>
@@ -76,7 +93,6 @@ const Dashboard = () => {
       <div className="dashboard-container">
         {/* LEFT PANEL */}
         <div className="main-panel">
-            {/* Header / Back Button */}
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 20}}>
             <h2>{selectedSpace ? "Reserve Space" : "Available Spaces"}</h2>
             {selectedSpace && (
@@ -86,18 +102,21 @@ const Dashboard = () => {
             )}
             </div>
 
-            {/* Space List */}
-            <div>
-            {displayedSpaces.map(space => (
-                <SpaceCard 
-                    key={space.id} 
-                    space={space} 
-                    isFavorite={favorites.includes(space.id)}
-                    toggleFavorite={toggleFavorite}
-                    onReserve={handleReserve}
-                />
-            ))}
-            </div>
+            {loadingSpaces ? (
+                <p>Loading spaces from database...</p>
+            ) : (
+                <div>
+                {displayedSpaces.map(space => (
+                    <SpaceCard 
+                        key={space._id || space.id} 
+                        space={space} 
+                        isFavorite={favorites.includes(space._id || space.id)}
+                        toggleFavorite={toggleFavorite}
+                        onReserve={handleReserve}
+                    />
+                ))}
+                </div>
+            )}
         </div>
 
         {/* RIGHT PANEL (SIDEBAR) */}
@@ -130,7 +149,7 @@ const Dashboard = () => {
                 {favorites.length === 0 && <p>No favorites added yet.</p>}
                 {myFavoriteSpaces.map(space => (
                   <div 
-                    key={space.id} 
+                    key={space._id || space.id} 
                     className="mini-card"
                     onClick={() => setSelectedSpace(space)}
                     title="Click to Reserve"
