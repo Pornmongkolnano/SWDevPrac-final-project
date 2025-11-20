@@ -10,15 +10,15 @@ const Dashboard = () => {
   // --- STATE ---
   const [spaces, setSpaces] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [favorites, setFavorites] = useState([]); // Now stores full Favorite objects from DB
   const [loading, setLoading] = useState(true);
-  const [favorites, setFavorites] = useState([]);
   const [selectedSpace, setSelectedSpace] = useState(null);
   
   // Sidebar State
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarMode, setSidebarMode] = useState('reserves');
 
-  // --- EDITING STATE (NEW) ---
+  // --- EDITING STATE ---
   const [editingReservationId, setEditingReservationId] = useState(null);
   const [editDate, setEditDate] = useState(""); 
 
@@ -26,24 +26,42 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // 1. Fetch Spaces
         const spacesRes = await api.get('/coworking-spaces');
         setSpaces(spacesRes.data.data);
+
+        // 2. Fetch Reservations
         await fetchReservations();
+
+        // 3. Fetch Favorites
+        await fetchFavorites();
+        
         setLoading(false);
       } catch (err) {
         console.error("Error fetching data:", err);
         setLoading(false);
       }
     };
+
     if (user) fetchData();
   }, [user]);
 
+  // --- API HELPERS ---
   const fetchReservations = async () => {
     try {
       const res = await api.get('/reservations');
       setReservations(res.data.data);
     } catch (err) {
       console.error("Failed to fetch reservations", err);
+    }
+  };
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await api.get('/favorites');
+      setFavorites(res.data.data);
+    } catch (err) {
+      console.error("Failed to fetch favorites", err);
     }
   };
 
@@ -90,11 +108,9 @@ const Dashboard = () => {
     }
   };
 
-  // --- NEW EDIT HANDLERS (No more prompt!) ---
-  
+  // --- EDITING HANDLERS ---
   const startEdit = (reservation) => {
     setEditingReservationId(reservation._id);
-    // Convert ISO date to YYYY-MM-DD for the input
     const currentDate = reservation.reservationDate ? reservation.reservationDate.split('T')[0] : '';
     setEditDate(currentDate);
   };
@@ -110,22 +126,42 @@ const Dashboard = () => {
         await api.put(`/reservations/${id}`, {
             reservationDate: editDate
         });
-        await fetchReservations(); // Refresh data
-        setEditingReservationId(null); // Exit edit mode
+        await fetchReservations(); 
+        setEditingReservationId(null);
     } catch (err) {
         alert(err.response?.data?.message || "Update failed");
     }
   };
 
-  const toggleFavorite = (id) => {
-    if (favorites.includes(id)) setFavorites(favorites.filter(favId => favId !== id));
-    else setFavorites([...favorites, id]);
+  // --- NEW TOGGLE FAVORITE HANDLER ---
+  const toggleFavorite = async (spaceId) => {
+    // Check if already favorite
+    const isFav = favorites.some(fav => fav.coworkingSpace._id === spaceId);
+
+    try {
+      if (isFav) {
+        // Remove: DELETE /favorites/:spaceId
+        await api.delete(`/favorites/${spaceId}`);
+      } else {
+        // Add: POST /favorites { coworkingSpaceId: spaceId }
+        await api.post('/favorites', { coworkingSpaceId: spaceId });
+      }
+      // Refresh list to sync UI
+      await fetchFavorites();
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+      alert("Could not update favorite");
+    }
   };
 
   // --- RENDER HELPERS ---
   const displayedSpaces = selectedSpace ? [selectedSpace] : spaces;
   const myReservations = reservations; 
-  const myFavoriteSpaces = spaces.filter(space => favorites.includes(space._id || space.id));
+  
+  // Helper to check if a specific space ID is in our favorites list
+  const checkIsFavorite = (spaceId) => {
+    return favorites.some(fav => fav.coworkingSpace && fav.coworkingSpace._id === spaceId);
+  };
 
   return (
     <div>
@@ -158,7 +194,8 @@ const Dashboard = () => {
                             <SpaceCard 
                                 key={space._id || space.id} 
                                 space={space} 
-                                isFavorite={favorites.includes(space._id || space.id)}
+                                // CHECK FAVORITE STATUS FROM API DATA
+                                isFavorite={checkIsFavorite(space._id || space.id)}
                                 toggleFavorite={toggleFavorite}
                                 onReserve={handleReserve}
                             />
@@ -193,7 +230,6 @@ const Dashboard = () => {
                                     {res.coworkingSpace ? res.coworkingSpace.name : 'Unknown Space'}
                                 </td>
                                 <td style={{padding: 10}}>
-                                    {/* TOGGLE BETWEEN VIEW AND EDIT MODE */}
                                     {editingReservationId === res._id ? (
                                         <input 
                                             type="date" 
@@ -247,8 +283,6 @@ const Dashboard = () => {
                             <strong>
                                 {res.coworkingSpace ? res.coworkingSpace.name : "Loading..."}
                             </strong>
-                            
-                            {/* TOGGLE BETWEEN VIEW AND EDIT MODE */}
                             {editingReservationId === res._id ? (
                                 <div style={{marginTop: 5, display:'flex', alignItems:'center', gap: 5}}>
                                     <input 
@@ -264,7 +298,6 @@ const Dashboard = () => {
                                 </div>
                             )}
                         </div>
-
                         <div style={{display:'flex', gap:2, marginLeft: 10}}>
                              {editingReservationId === res._id ? (
                                 <>
@@ -290,16 +323,33 @@ const Dashboard = () => {
                     My Favorites ({favorites.length})
                     </h3>
                     {favorites.length === 0 && <p>No favorites added yet.</p>}
-                    {myFavoriteSpaces.map(space => (
+                    {favorites.map(fav => (
                     <div 
-                        key={space._id || space.id} 
+                        key={fav._id} 
                         className="mini-card"
-                        onClick={() => setSelectedSpace(space)}
+                        // NOTE: fav.coworkingSpace might be null if space was deleted
+                        onClick={() => fav.coworkingSpace && setSelectedSpace(fav.coworkingSpace)}
                         title="Click to Reserve"
                     >
                         <div>
-                        <strong>{space.name}</strong>
-                        <div style={{fontSize: '0.85rem', color: '#666', marginTop:2}}>{space.address}</div>
+                        <strong>{fav.coworkingSpace ? fav.coworkingSpace.name : 'Unavailable'}</strong>
+                        <div style={{fontSize: '0.85rem', color: '#666', marginTop:2}}>
+                            {fav.coworkingSpace ? fav.coworkingSpace.address : 'Space removed'}
+                        </div>
+                        </div>
+                        <div style={{display:'flex', gap:5}}>
+                            <button 
+                                className="icon-btn" 
+                                title="Remove Favorite"
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    // Pass the SPACE ID to delete, not the Favorite ID
+                                    if(fav.coworkingSpace) toggleFavorite(fav.coworkingSpace._id);
+                                }}
+                                style={{fontSize: '1rem'}}
+                            >
+                            ❌
+                            </button>
                         </div>
                     </div>
                     ))}
