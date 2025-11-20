@@ -37,6 +37,16 @@ h1, h2, h3, h4, h5, h6 { color: var(--text-main); margin-top: 0; }
 p, span, label, div { color: var(--text-body); }
 button { font-family: inherit; }
 
+/* --- LOADING SCREEN --- */
+.loading-screen {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  color: var(--primary);
+}
+
 /* --- LOGIN / REGISTER SCREEN --- */
 .auth-container {
   display: flex;
