@@ -32,6 +32,8 @@ const UserSchema = new mongoose.Schema({
     minlength: 6,
     select: false,
   },
+  loginOtpCode: String,
+  loginOtpExpire: Date,
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   createdAt: {
