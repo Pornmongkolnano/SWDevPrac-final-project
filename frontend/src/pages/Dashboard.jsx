@@ -136,7 +136,7 @@ const Dashboard = () => {
   // --- NEW TOGGLE FAVORITE HANDLER ---
   const toggleFavorite = async (spaceId) => {
     // Check if already favorite
-    const isFav = favorites.some(fav => fav.coworkingSpace._id === spaceId);
+    const isFav = favorites.some(fav => fav.coworkingSpace?._id === spaceId);
 
     try {
       if (isFav) {

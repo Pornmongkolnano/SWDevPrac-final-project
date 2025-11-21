@@ -9,9 +9,9 @@ const sendEmail = require("../utils/sendEmail");
 
 exports.register = async (req, res, next) => {
   try {
-    const { name, telephone, email, password, role } = req.body;
+    const { name, telephone, email, password } = req.body;
     //Create user
-    await User.create({ name, telephone, email, password, role });
+    await User.create({ name, telephone, email, password, role: "user" });
 
     return res.status(201).json({
       success: true,

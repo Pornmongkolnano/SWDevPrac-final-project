@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const { xss } = require("express-xss-sanitizer");
 const rateLimit = require("express-rate-limit");
 const hpp = require("hpp");
+const mongoSanitize = require("express-mongo-sanitize");
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUI = require("swagger-ui-express");
 //Load env vars
@@ -59,6 +60,13 @@ app.use(express.json());
 app.use(xss());
 //Prevent http param pollutions
 app.use(hpp());
+//Prevent NoSQL injection (mutate in place to avoid read-only query assignment issues)
+app.use((req, res, next) => {
+  if (req.body) mongoSanitize.sanitize(req.body);
+  if (req.query) mongoSanitize.sanitize(req.query);
+  if (req.params) mongoSanitize.sanitize(req.params);
+  next();
+});
 //Mount routers
 app.use("/api/v1/coworking-spaces", coworkingSpaces);
 app.use("/api/v1/reservations", reservations);
