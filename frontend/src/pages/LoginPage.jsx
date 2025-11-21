@@ -1,5 +1,5 @@
-import { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useContext, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import '../App.css';
 
@@ -9,7 +9,17 @@ const LoginPage = () => {
   const [step, setStep] = useState('password'); // 'password' | 'otp'
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.message) {
+      setMessage(location.state.message);
+    }
+    if (location.state?.email) {
+      setFormData(prev => ({ ...prev, email: location.state.email }));
+    }
+  }, [location.state]);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();

@@ -67,9 +67,7 @@ export const AuthProvider = ({ children }) => {
       password,
       role: 'user'
     });
-    localStorage.setItem('token', res.data.token);
-    setUser(res.data);
-    return true;
+    return res.data;
   };
 
   // Logout Action

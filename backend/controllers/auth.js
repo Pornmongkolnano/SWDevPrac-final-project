@@ -11,11 +11,12 @@ exports.register = async (req, res, next) => {
   try {
     const { name, telephone, email, password, role } = req.body;
     //Create user
-    const user = await User.create({ name, telephone, email, password, role });
+    await User.create({ name, telephone, email, password, role });
 
-    // const token = user.getSignedJwtToken();
-    // res.status(200).json({ success: true, token });
-    sendTokenResponse(user, 200, res);
+    return res.status(201).json({
+      success: true,
+      msg: "Registration successful. Please login to continue.",
+    });
   } catch (err) {
     res.status(400).json({ success: false });
     console.log(err.stack);
