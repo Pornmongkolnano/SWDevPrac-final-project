@@ -7,15 +7,14 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. Check if user is logged in on App Load
+  // Check if user is logged in on app load
   useEffect(() => {
     const checkUserLoggedIn = async () => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          // Call your backend's /me endpoint
           const res = await api.get('/auth/me');
-          setUser(res.data.data); // Assuming backend returns { success: true, data: user }
+          setUser(res.data.data);
         } catch (error) {
           localStorage.removeItem('token');
           setUser(null);
@@ -26,43 +25,67 @@ export const AuthProvider = ({ children }) => {
     checkUserLoggedIn();
   }, []);
 
-  // 2. Login Action
+  // Step 1: Password login -> triggers OTP email
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
+
+    if (res.data?.otpRequired) {
+      // Caller will prompt for OTP
+      return { otpRequired: true };
+    }
+
+    // Fallback for legacy flow
+    if (res.data?.token) {
+      localStorage.setItem('token', res.data.token);
+      const meRes = await api.get('/auth/me');
+      setUser(meRes.data.data);
+      return { otpRequired: false };
+    }
+
+    throw new Error('Unexpected login response');
+  };
+
+  // Step 2: Verify OTP -> receive JWT
+  const verifyOtp = async (email, otp) => {
+    const res = await api.post('/auth/verify-otp', { email, otp });
+    if (!res.data?.token) {
+      throw new Error('OTP verification failed');
+    }
+
     localStorage.setItem('token', res.data.token);
-    setUser(res.data); // Or fetch /me immediately after
-    // For safety, let's fetch the full user object ensuring role is present
     const meRes = await api.get('/auth/me');
     setUser(meRes.data.data);
     return true;
   };
 
-  // 3. Register Action
+  // Register Action
   const register = async (name, telephone, email, password) => {
     const res = await api.post('/auth/register', {
       name,
-      telephone, // Matches your backend model
+      telephone,
       email,
       password,
       role: 'user'
     });
     localStorage.setItem('token', res.data.token);
-    setUser(res.data); // Or fetch /me
+    setUser(res.data);
     return true;
   };
 
-  // 4. Logout Action
+  // Logout Action
   const logout = async () => {
     try {
-        await api.get('/auth/logout'); // Call backend logout (clear cookie)
-    } catch (err) { console.error(err); }
-    
+      await api.get('/auth/logout');
+    } catch (err) {
+      console.error(err);
+    }
+
     localStorage.removeItem('token');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, verifyOtp, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

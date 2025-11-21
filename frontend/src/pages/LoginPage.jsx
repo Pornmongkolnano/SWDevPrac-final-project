@@ -1,36 +1,108 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import '../App.css'; // Keep using your CSS
+import '../App.css';
 
 const LoginPage = () => {
-  const { login } = useContext(AuthContext);
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const { login, verifyOtp } = useContext(AuthContext);
+  const [formData, setFormData] = useState({ email: '', password: '', otp: '' });
+  const [step, setStep] = useState('password'); // 'password' | 'otp'
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setMessage('');
     try {
-      await login(formData.email, formData.password);
-      navigate('/dashboard'); // Redirect on success
+      const result = await login(formData.email, formData.password);
+      if (result?.otpRequired) {
+        setStep('otp');
+        setMessage('OTP sent to your email. Please enter the 6-digit code.');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
-      alert("Login Failed. Check credentials.");
+      setMessage('Login failed. Please check your credentials and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    try {
+      await verifyOtp(formData.email, formData.otp);
+      navigate('/dashboard');
+    } catch (err) {
+      setMessage('OTP verification failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="auth-container">
       <div className="auth-box">
-        <h2 style={{textAlign:'center', marginBottom: 10}}>Login</h2>
-        <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:15}}>
-            <input className="auth-input" type="email" placeholder="Email" required
-                onChange={e => setFormData({...formData, email: e.target.value})} />
-            <input className="auth-input" type="password" placeholder="Password" required
-                onChange={e => setFormData({...formData, password: e.target.value})} />
-            <button className="btn-primary" type="submit">Login</button>
-        </form>
+        <h2 style={{ textAlign: 'center', marginBottom: 10 }}>Login</h2>
+        {message && <p style={{ color: '#d14343', textAlign: 'center', marginBottom: 5 }}>{message}</p>}
+
+        {step === 'password' && (
+          <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+            <input
+              className="auth-input"
+              type="email"
+              placeholder="Email"
+              required
+              value={formData.email}
+              onChange={e => setFormData({ ...formData, email: e.target.value })}
+            />
+            <input
+              className="auth-input"
+              type="password"
+              placeholder="Password"
+              required
+              value={formData.password}
+              onChange={e => setFormData({ ...formData, password: e.target.value })}
+            />
+            <button className="btn-primary" type="submit" disabled={loading}>
+              {loading ? 'Sending OTP...' : 'Login'}
+            </button>
+          </form>
+        )}
+
+        {step === 'otp' && (
+          <form onSubmit={handleOtpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+            <input
+              className="auth-input"
+              type="text"
+              placeholder="Enter 6-digit OTP"
+              required
+              value={formData.otp}
+              onChange={e => setFormData({ ...formData, otp: e.target.value })}
+            />
+            <button className="btn-primary" type="submit" disabled={loading}>
+              {loading ? 'Verifying...' : 'Verify OTP'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setStep('password');
+                setFormData({ ...formData, otp: '' });
+                setMessage('');
+              }}
+            >
+              Back to login
+            </button>
+          </form>
+        )}
+
         <Link to="/register">
-            <button className="btn-secondary" style={{width:'100%'}}>Create Account</button>
+          <button className="btn-secondary" style={{ width: '100%', marginTop: 10 }}>Create Account</button>
         </Link>
       </div>
     </div>
