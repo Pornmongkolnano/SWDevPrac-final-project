@@ -9,12 +9,14 @@ const LoginPage = () => {
   const [step, setStep] = useState('password'); // 'password' | 'otp'
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('info'); // 'info' | 'success' | 'error'
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (location.state?.message) {
       setMessage(location.state.message);
+      setMessageType(location.state.messageType || 'success');
     }
     if (location.state?.email) {
       setFormData(prev => ({ ...prev, email: location.state.email }));
@@ -25,16 +27,19 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setMessageType('info');
     try {
       const result = await login(formData.email, formData.password);
       if (result?.otpRequired) {
         setStep('otp');
         setMessage('OTP sent to your email. Please enter the 6-digit code.');
+        setMessageType('info');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
       setMessage('Login failed. Please check your credentials and try again.');
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -44,11 +49,13 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
+    setMessageType('info');
     try {
       await verifyOtp(formData.email, formData.otp);
       navigate('/dashboard');
     } catch (err) {
       setMessage('OTP verification failed. Please try again.');
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -58,7 +65,22 @@ const LoginPage = () => {
     <div className="auth-container">
       <div className="auth-box">
         <h2 style={{ textAlign: 'center', marginBottom: 10 }}>Login</h2>
-        {message && <p style={{ color: '#d14343', textAlign: 'center', marginBottom: 5 }}>{message}</p>}
+        {message && (
+          <p
+            style={{
+              color:
+                messageType === 'success'
+                  ? '#2f855a'
+                  : messageType === 'error'
+                  ? '#d14343'
+                  : '#444',
+              textAlign: 'center',
+              marginBottom: 5
+            }}
+          >
+            {message}
+          </p>
+        )}
 
         {step === 'password' && (
           <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>

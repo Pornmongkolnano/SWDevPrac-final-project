@@ -17,6 +17,7 @@ const RegisterPage = () => {
       navigate('/login', {
         state: {
           message: 'Registration successful. Please login with your credentials.',
+          messageType: 'success',
           email: formData.email
         }
       });
