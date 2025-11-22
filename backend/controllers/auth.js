@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 const sanitize = require("mongo-sanitize");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
@@ -28,7 +29,7 @@ exports.register = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = sanitize({ ...req.body});
+    const { email, password } = sanitize({ ...req.body });
 
     // Validate email & password
     if (!email || !password) {
@@ -63,6 +64,18 @@ exports.login = async (req, res, next) => {
       loginOtpExpire: otpExpire,
     });
 
+    const pendingLoginToken = jwt.sign(
+      { id: user._id, stage: "otp_pending" },
+      process.env.JWT_SECRET,
+      { expiresIn: otpExpireMinutes * 60 }
+    );
+
+    res.cookie(
+      "pending_login",
+      pendingLoginToken,
+      buildPendingCookieOptions(otpExpire)
+    );
+
     try {
       await sendEmail({
         email: user.email,
@@ -74,6 +87,7 @@ exports.login = async (req, res, next) => {
       await User.findByIdAndUpdate(user._id, {
         $unset: { loginOtpCode: 1, loginOtpExpire: 1 },
       });
+      clearPendingLoginCookie(res);
 
       return res.status(500).json({
         success: false,
@@ -100,17 +114,19 @@ exports.login = async (req, res, next) => {
 // @access  Public (follows a password-authenticated login)
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = sanitize({ ...req.body });
+    const { otp } = sanitize({ ...req.body });
+    const user = req.pendingUser;
 
-    if (!email || !otp) {
+    if (!otp) {
+      clearPendingLoginCookie(res);
       return res
         .status(400)
-        .json({ success: false, msg: "Please provide email and otp" });
+        .json({ success: false, msg: "Please provide otp" });
     }
 
-    const user = await User.findOne({ email });
     if (!user || !user.loginOtpCode || !user.loginOtpExpire) {
-      return res.status(400).json({
+      clearPendingLoginCookie(res);
+      return res.status(401).json({
         success: false,
         msg: "Invalid or expired OTP",
       });
@@ -120,6 +136,7 @@ exports.verifyOtp = async (req, res) => {
       await User.findByIdAndUpdate(user._id, {
         $unset: { loginOtpCode: 1, loginOtpExpire: 1 },
       });
+      clearPendingLoginCookie(res);
       return res
         .status(400)
         .json({ success: false, msg: "OTP has expired. Please login again." });
@@ -131,7 +148,11 @@ exports.verifyOtp = async (req, res) => {
       .digest("hex");
 
     if (hashedOtp !== user.loginOtpCode) {
-      return res.status(400).json({
+      await User.findByIdAndUpdate(user._id, {
+        $unset: { loginOtpCode: 1, loginOtpExpire: 1 },
+      });
+      clearPendingLoginCookie(res);
+      return res.status(401).json({
         success: false,
         msg: "Invalid OTP",
       });
@@ -140,6 +161,7 @@ exports.verifyOtp = async (req, res) => {
     await User.findByIdAndUpdate(user._id, {
       $unset: { loginOtpCode: 1, loginOtpExpire: 1 },
     });
+    clearPendingLoginCookie(res);
 
     sendTokenResponse(user, 200, res);
   } catch (err) {
@@ -149,6 +171,33 @@ exports.verifyOtp = async (req, res) => {
       msg: "OTP verification failed",
     });
   }
+};
+
+const buildPendingCookieOptions = (expires) => {
+  const options = {
+    expires,
+    httpOnly: true,
+    sameSite: "lax",
+  };
+
+  if (process.env.NODE_ENV === "production") {
+    options.secure = true;
+  }
+
+  return options;
+};
+
+const clearPendingLoginCookie = (res) => {
+  const options = {
+    httpOnly: true,
+    sameSite: "lax",
+  };
+
+  if (process.env.NODE_ENV === "production") {
+    options.secure = true;
+  }
+
+  res.clearCookie("pending_login", options);
 };
 
 // Get token from model, create cookie and send response
