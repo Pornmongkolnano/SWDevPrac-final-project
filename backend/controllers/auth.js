@@ -54,7 +54,7 @@ exports.login = async (req, res, next) => {
         .json({ success: false, msg: "Invalid credentials" });
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = crypto.randomInt(100000, 999999).toString();
     const hashedOtp = crypto.createHash("sha256").update(otpCode).digest("hex");
     const otpExpireMinutes = Number(process.env.OTP_EXP_MINUTES) || 10;
     const otpExpire = new Date(Date.now() + otpExpireMinutes * 60 * 1000);
