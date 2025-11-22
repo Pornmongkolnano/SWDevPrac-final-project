@@ -144,14 +144,14 @@ exports.updateReservation = async (req, res, next) => {
       });
     }
 
-    reservation = await Reservation.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const { reservationDate } = req.body;
+    const update = {};
+    if (reservationDate) update.reservationDate = reservationDate;
+
+    reservation = await Reservation.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
 
     res.status(200).json({
       success: true,
