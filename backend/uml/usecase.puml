@@ -1,0 +1,60 @@
+@startuml CoworkingReservationSystem
+skinparam actorStyle awesome
+
+left to right direction
+
+' Actors
+actor User
+actor Admin
+
+
+' Packages/Groups
+package "Authentication System" {
+  usecase UC_Register as "Register Account"
+  usecase UC_Login as "Login"
+  usecase UC_Logout as "Logout"
+  usecase UC_GetProfile as "View My Profile"
+}
+
+package "Coworking Space Management" {
+  usecase UC_ViewSpaces as "View All Spaces"
+  usecase UC_ViewSpaceDetail as "View Space Details"
+  usecase UC_CreateSpace as "Create Space"
+  usecase UC_UpdateSpace as "Update Space"
+  usecase UC_DeleteSpace as "Delete Space"
+}
+
+package "Reservation Management" {
+  usecase UC_ViewReservations as "View My Reservations"
+  usecase UC_ViewReservationDetail as "View Reservation Details"
+  usecase UC_MakeReservation as "Make Reservation"
+  usecase UC_UpdateReservation as "Update Reservation"
+  usecase UC_CancelReservation as "Cancel Reservation"
+}
+
+
+
+' User associations
+User --> UC_Register
+User --> UC_Login
+User --> UC_Logout
+User --> UC_GetProfile
+User --> UC_ViewSpaces
+User --> UC_ViewSpaceDetail
+User --> UC_ViewReservations
+User --> UC_ViewReservationDetail
+User --> UC_MakeReservation
+User --> UC_UpdateReservation
+User --> UC_CancelReservation
+
+' Admin associations
+UC_CreateSpace <-- Admin
+UC_UpdateSpace <-- Admin
+UC_DeleteSpace <-- Admin
+
+
+
+
+
+
+@enduml

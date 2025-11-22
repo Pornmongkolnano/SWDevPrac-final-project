@@ -1,0 +1,76 @@
+@startuml CoworkingReservationAPI
+left to right direction
+package "Coworking Reservation API"{
+    class "<<Application>>\nCoworkingService" as CoworkingService{}
+
+    class "<<Resource>>\nCoworkingSpaces" as ResourceCoworkingSpaces{
+        <<GET>> +getCoworkingSpaces(): CoworkingSpace[]
+        <<POST>> +createCoworkingSpace(): CoworkingSpace
+    }
+
+    class "<<Resource>>\nCoworkingSpace" as ResourceCoworkingSpace {
+        <<GET>> +getCoworkingSpace(): CoworkingSpace
+        <<PUT>> +updateCoworkingSpace(): CoworkingSpace
+        <<DELETE>> +deleteCoworkingSpace(): void
+    }
+
+    class "<<Resource>>\nReservations" as ResourceReservations{
+        <<GET>> +getReservations(): Reservation[]
+        <<POST>> +addReservation(): Reservation
+    }
+
+    class "<<Resource>>\nReservation" as ResourceReservation{
+        <<GET>> +getReservation(): Reservation
+        <<PUT>> +updateReservation(): Reservation
+        <<DELETE>> +deleteReservation(): void
+    }
+
+    class "<<Resource>>\nAuth" as ResourceAuth{
+        <<POST>> +register(): User
+        <<POST>> +login(): Token
+        <<GET>> +me(): User
+        <<GET>> +logout(): void
+    }
+
+    class "<<Representation>>\nCoworkingSpace" as RepresentationCoworkingSpace {
+        +_id: ObjectId
+        -name: String
+        -address: String
+        -tel: String
+        -openTime: String
+        -closeTime: String
+    }
+
+    class "<<Representation>>\nReservation" as RepresentationReservation{
+        +_id: ObjectId
+        -reservationDate: Date
+        -user: ObjectId
+        -coworkingSpace: ObjectId
+        -createdAt: Date
+    }
+
+    class "<<Representation>>\nUser" as RepresentationUser{
+        +_id: ObjectId
+        -name: String
+        -telephone: String
+        -email: String
+        -role: String
+        -createdAt: Date
+    }
+
+}
+
+CoworkingService ..> ResourceCoworkingSpaces: "/api/v1/coworking-spaces\n<<Path>>"
+ResourceCoworkingSpaces ..> ResourceCoworkingSpace: "/{id}\n<<Path>>"
+ResourceCoworkingSpace ..> RepresentationCoworkingSpace: "<<use>>"
+
+CoworkingService ..> ResourceReservations: "/api/v1/reservations\n<<Path>>"
+ResourceReservations ..> ResourceReservation: "/{id}\n<<Path>>"
+ResourceReservation ..> RepresentationReservation: "<<use>>"
+
+CoworkingService ..> ResourceAuth: "/api/v1/auth\n<<Path>>"
+ResourceAuth ..> RepresentationUser: "<<use>>"
+
+
+
+@enduml

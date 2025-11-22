@@ -1,0 +1,363 @@
+@startuml AuthRegister
+title "AUTH: Register User (POST /api/v1/auth/register)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<router>>\n:auth" as authRouter
+participant "<<controller>>\n:auth" as authController
+participant "<<model>>\n:User" as userModel
+database "<<MongoDB>>\n:users" as usersDB
+
+client->server ++: POST /api/v1/auth/register\n{name, email, password, telephone}
+server->authRouter ++: route handler
+authRouter -> authController ++: register(req, res, next)
+authController->userModel ++: User.create({...})
+userModel ->usersDB ++: Insert & hash password
+usersDB --> userModel --: user document
+authController <-- userModel --: user object
+authController -> authController: getSignedJwtToken()
+authController-->client --: 200 {success, token, user_data}
+
+@enduml
+
+@startuml AuthLogin
+title "AUTH: Login User (POST /api/v1/auth/login)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<router>>\n:auth" as authRouter
+participant "<<controller>>\n:auth" as authController
+participant "<<model>>\n:User" as userModel
+database "<<MongoDB>>\n:users" as usersDB
+
+client->server ++: POST /api/v1/auth/login\n{email, password}
+server->authRouter ++: route handler
+authRouter -> authController ++: login(req, res, next)
+authController -> authController: sanitize({email, password})
+authController->userModel ++: User.findOne({email}).select("+password")
+userModel ->usersDB ++: Query
+usersDB --> userModel --: user with password
+authController <-- userModel --: user object
+authController -> authController: matchPassword(password)
+authController -> authController: getSignedJwtToken()
+authController-->client --: 200 {success, token, user_data}
+
+@enduml
+
+@startuml CoworkingSpaceGetAll
+title "COWORKING SPACE: Get All Spaces (GET /api/v1/coworking-spaces)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<router>>\n:coworkingSpaces" as csRouter
+participant "<<controller>>\n:coworkingSpaces" as csController
+participant "<<model>>\n:CoworkingSpace" as csModel
+database "<<MongoDB>>\n:coworkingspaces" as csDB
+
+client->server ++: GET /api/v1/coworking-spaces?page=1&limit=25
+server->csRouter ++: route handler
+csRouter -> csController ++: getCoworkingSpaces(req, res, next)
+csController -> csController: Parse filters, sort, pagination
+csController->csModel ++: find().populate("reservations").skip(0).limit(25)
+csModel ->csDB ++: Query & fetch
+csDB --> csModel --: array of coworking spaces
+csController <-- csModel --: coworkingSpaces[]
+csController-->client --: 200 {success, count, data, pagination}
+
+@enduml
+
+@startuml CoworkingSpaceCreate
+title "COWORKING SPACE: Create Space (POST /api/v1/coworking-spaces)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:coworkingSpaces" as csRouter
+participant "<<controller>>\n:coworkingSpaces" as csController
+participant "<<model>>\n:CoworkingSpace" as csModel
+database "<<MongoDB>>\n:coworkingspaces" as csDB
+
+client->server ++: POST /api/v1/coworking-spaces\n{name, address, tel, openTime, closeTime}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -> middleware: verify token, extract user
+middleware -->server --: req.user = {id, role}
+server->csRouter ++: route handler (admin only)
+csRouter -> csController ++: createCoworkingSpace(req, res, next)
+csController->csModel ++: CoworkingSpace.create(req.body)
+csModel ->csDB ++: Insert new space
+csDB --> csModel --: space document
+csController <-- csModel --: coworkingSpace object
+csController-->client --: 201 {success, data}
+
+@enduml
+
+@startuml ReservationAdd
+title "RESERVATION: Create Reservation (POST /api/v1/coworking-spaces/:id/reservations)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:reservations" as resRouter
+participant "<<controller>>\n:reservations" as resController
+participant "<<model>>\n:CoworkingSpace" as csModel
+participant "<<model>>\n:Reservation" as resModel
+database "<<MongoDB>>\n" as DB
+
+client->server ++: POST /api/v1/coworking-spaces/{id}/reservations\n{reservationDate}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->resRouter ++: route handler
+resRouter -> resController ++: addReservation(req, res, next)
+resController->csModel ++: CoworkingSpace.findById(id)
+csModel --> resController --: coworkingSpace
+resController -> resController: Check user reservation limit (max 3 for users)
+resController->resModel ++: Reservation.create({user, coworkingSpace, reservationDate})
+resModel -->DB ++: Insert reservation
+DB --> resModel --: reservation document
+resController <-- resModel --: reservation object
+resController-->client --: 200 {success, data}
+
+@enduml
+
+@startuml ReservationGet
+title "RESERVATION: Get User Reservations (GET /api/v1/reservations)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:reservations" as resRouter
+participant "<<controller>>\n:reservations" as resController
+participant "<<model>>\n:Reservation" as resModel
+database "<<MongoDB>>\n:reservations" as resDB
+
+client->server ++: GET /api/v1/reservations\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->resRouter ++: route handler
+resRouter -> resController ++: getReservations(req, res, next)
+resController -> resController: Build query based on user role\n(user: only own reservations)\n(admin: all reservations)
+resController->resModel ++: Reservation.find({user: req.user.id})\n.populate("coworkingSpace")
+resModel -->resDB ++: Query
+resDB --> resModel --: array of reservations
+resController <-- resModel --: reservations[]
+resController-->client --: 200 {success, count, data}
+
+@enduml
+
+@startuml AuthLogout
+title "AUTH: Logout User (GET /api/v1/auth/logout)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:auth" as authRouter
+participant "<<controller>>\n:auth" as authController
+
+client->server ++: GET /api/v1/auth/logout\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->authRouter ++: route handler
+authRouter -> authController ++: logout(req, res, next)
+authController -> authController: Clear JWT token\n(set token='none', expires in 10s)
+authController-->client --: 200 {success, data: {}}
+
+@enduml
+
+@startuml AuthGetMe
+title "AUTH: Get Current User (GET /api/v1/auth/me)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:auth" as authRouter
+participant "<<controller>>\n:auth" as authController
+participant "<<model>>\n:User" as userModel
+database "<<MongoDB>>\n:users" as usersDB
+
+client->server ++: GET /api/v1/auth/me\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->authRouter ++: route handler
+authRouter -> authController ++: getMe(req, res, next)
+authController->userModel ++: User.findById(req.user.id)
+userModel ->usersDB ++: Query by ID
+usersDB --> userModel --: user document
+authController <-- userModel --: user object
+authController-->client --: 200 {success, data: user}
+
+@enduml
+
+@startuml CoworkingSpaceGetOne
+title "COWORKING SPACE: Get Single Space (GET /api/v1/coworking-spaces/:id)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<router>>\n:coworkingSpaces" as csRouter
+participant "<<controller>>\n:coworkingSpaces" as csController
+participant "<<model>>\n:CoworkingSpace" as csModel
+database "<<MongoDB>>\n:coworkingspaces" as csDB
+
+client->server ++: GET /api/v1/coworking-spaces/{id}
+server->csRouter ++: route handler
+csRouter -> csController ++: getCoworkingSpace(req, res, next)
+csController->csModel ++: CoworkingSpace.findById(req.params.id)
+csModel ->csDB ++: Query by ID
+csDB --> csModel --: space document
+alt space found
+  csController <-- csModel --: coworkingSpace object
+  csController-->client --: 200 {success, data: coworkingSpace}
+else space not found
+  csController-->client --: 400 {success: false, message: "not found"}
+end
+
+@enduml
+
+@startuml CoworkingSpaceUpdate
+title "COWORKING SPACE: Update Space (PUT /api/v1/coworking-spaces/:id)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:coworkingSpaces" as csRouter
+participant "<<controller>>\n:coworkingSpaces" as csController
+participant "<<model>>\n:CoworkingSpace" as csModel
+database "<<MongoDB>>\n:coworkingspaces" as csDB
+
+client->server ++: PUT /api/v1/coworking-spaces/{id}\n{name, address, tel, openTime, closeTime}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -> middleware: authorize("admin")
+middleware -->server --: req.user = {id, role}
+server->csRouter ++: route handler (admin only)
+csRouter -> csController ++: updateCoworkingSpace(req, res, next)
+csController->csModel ++: CoworkingSpace.findByIdAndUpdate(id, req.body,\n{new: true, runValidators: true})
+csModel ->csDB ++: Update & return updated doc
+csDB --> csModel --: updated space document
+csController <-- csModel --: coworkingSpace object
+csController-->client --: 200 {success, data: coworkingSpace}
+
+@enduml
+
+@startuml CoworkingSpaceDelete
+title "COWORKING SPACE: Delete Space (DELETE /api/v1/coworking-spaces/:id)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:coworkingSpaces" as csRouter
+participant "<<controller>>\n:coworkingSpaces" as csController
+participant "<<model>>\n:CoworkingSpace" as csModel
+participant "<<model>>\n:Reservation" as resModel
+database "<<MongoDB>>\n" as DB
+
+client->server ++: DELETE /api/v1/coworking-spaces/{id}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -> middleware: authorize("admin")
+middleware -->server --: req.user = {id, role}
+server->csRouter ++: route handler (admin only)
+csRouter -> csController ++: deleteCoworkingSpace(req, res, next)
+csController->csModel ++: CoworkingSpace.findById(id)
+csModel -->DB ++: Query
+DB --> csModel --: space document
+csController -> resModel ++: Reservation.deleteMany({coworkingSpace: id})
+resModel -->DB ++: Delete cascade
+DB --> resModel --: deleted count
+csController -> csModel ++: CoworkingSpace.deleteOne({_id: id})
+csModel -->DB ++: Delete
+DB --> csModel --: deleted
+csController-->client --: 200 {success, data: {}}
+
+@enduml
+
+@startuml ReservationGetOne
+title "RESERVATION: Get Single Reservation (GET /api/v1/reservations/:id)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:reservations" as resRouter
+participant "<<controller>>\n:reservations" as resController
+participant "<<model>>\n:Reservation" as resModel
+database "<<MongoDB>>\n:reservations" as resDB
+
+client->server ++: GET /api/v1/reservations/{id}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->resRouter ++: route handler
+resRouter -> resController ++: getReservation(req, res, next)
+resController->resModel ++: Reservation.findById(id)\n.populate("coworkingSpace")
+resModel -->resDB ++: Query by ID
+resDB --> resModel --: reservation document
+alt reservation found
+  resController <-- resModel --: reservation object
+  resController-->client --: 200 {success, data: reservation}
+else reservation not found
+  resController-->client --: 404 {success: false, message: "not found"}
+end
+
+@enduml
+
+@startuml ReservationUpdate
+title "RESERVATION: Update Reservation (PUT /api/v1/reservations/:id)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:reservations" as resRouter
+participant "<<controller>>\n:reservations" as resController
+participant "<<model>>\n:Reservation" as resModel
+database "<<MongoDB>>\n:reservations" as resDB
+
+client->server ++: PUT /api/v1/reservations/{id}\n{reservationDate}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->resRouter ++: route handler
+resRouter -> resController ++: updateReservation(req, res, next)
+resController->resModel ++: Reservation.findById(id)
+resModel -->resDB ++: Query
+resDB --> resModel --: reservation document
+resController -> resController: Check authorization\n(owner or admin only)
+alt authorized
+  resController->resModel ++: Reservation.findByIdAndUpdate(id, req.body,\n{new: true, runValidators: true})
+  resModel -->resDB ++: Update & return updated doc
+  resDB --> resModel --: updated reservation
+  resController <-- resModel --: reservation object
+  resController-->client --: 200 {success, data: reservation}
+else not authorized
+  resController-->client --: 401 {success: false, message: "not authorized"}
+end
+
+@enduml
+
+@startuml ReservationDelete
+title "RESERVATION: Delete Reservation (DELETE /api/v1/reservations/:id)"
+
+participant "Client" as client
+participant "<<express>>\n:server" as server
+participant "<<middleware>>\n:protect" as middleware
+participant "<<router>>\n:reservations" as resRouter
+participant "<<controller>>\n:reservations" as resController
+participant "<<model>>\n:Reservation" as resModel
+database "<<MongoDB>>\n:reservations" as resDB
+
+client->server ++: DELETE /api/v1/reservations/{id}\nheaders: {token}
+server->middleware ++: protect (verify JWT)
+middleware -->server --: req.user = {id, role}
+server->resRouter ++: route handler
+resRouter -> resController ++: deleteReservation(req, res, next)
+resController->resModel ++: Reservation.findById(id)
+resModel -->resDB ++: Query
+resDB --> resModel --: reservation document
+resController -> resController: Check authorization\n(owner or admin only)
+alt authorized
+  resController->resModel ++: reservation.deleteOne()
+  resModel -->resDB ++: Delete
+  resDB --> resModel --: deleted
+  resController-->client --: 200 {success, data: {}}
+else not authorized
+  resController-->client --: 401 {success: false, message: "not authorized"}
+end
+
+@enduml
+
+
+
