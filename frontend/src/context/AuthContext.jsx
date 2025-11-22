@@ -7,20 +7,17 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is logged in on app load
+  // Check if user is logged in on app load (uses HttpOnly cookie)
   useEffect(() => {
     const checkUserLoggedIn = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const res = await api.get('/auth/me');
-          setUser(res.data.data);
-        } catch (error) {
-          localStorage.removeItem('token');
-          setUser(null);
-        }
+      try {
+        const res = await api.get('/auth/me');
+        setUser(res.data.data);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     checkUserLoggedIn();
   }, []);
@@ -34,9 +31,8 @@ export const AuthProvider = ({ children }) => {
       return { otpRequired: true };
     }
 
-    // Fallback for legacy flow
-    if (res.data?.token) {
-      localStorage.setItem('token', res.data.token);
+    // Fallback for legacy flow (if server returns token directly)
+    if (res.data?.token || res.data?.success) {
       const meRes = await api.get('/auth/me');
       setUser(meRes.data.data);
       return { otpRequired: false };
@@ -48,11 +44,10 @@ export const AuthProvider = ({ children }) => {
   // Step 2: Verify OTP -> receive JWT
   const verifyOtp = async (email, otp) => {
     const res = await api.post('/auth/verify-otp', { email, otp });
-    if (!res.data?.token) {
+    if (!res.data?.success && !res.data?.token) {
       throw new Error('OTP verification failed');
     }
 
-    localStorage.setItem('token', res.data.token);
     const meRes = await api.get('/auth/me');
     setUser(meRes.data.data);
     return true;
@@ -78,7 +73,6 @@ export const AuthProvider = ({ children }) => {
       console.error(err);
     }
 
-    localStorage.removeItem('token');
     setUser(null);
   };
 

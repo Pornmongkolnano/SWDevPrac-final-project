@@ -45,7 +45,15 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerDocs));
 // ✅ ตั้งค่า CORS
-app.use(cors());
+const allowedOrigins = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(",")
+  : ["http://localhost:5173"];
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
 //Rate Limiting
 const limiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 mins
@@ -56,6 +64,8 @@ app.use(limiter);
 app.use(helmet());
 //Body parser app.use(expres
 app.use(express.json());
+// Parse cookies for HttpOnly JWT auth
+app.use(cookieParser());
 //Prevent XSS attacks
 app.use(xss());
 //Prevent http param pollutions
@@ -72,7 +82,6 @@ app.use("/api/v1/coworking-spaces", coworkingSpaces);
 app.use("/api/v1/reservations", reservations);
 app.use("/api/v1/auth", auth);
 app.use('/api/v1/favorites', favorites);
-app.use(cookieParser());
 
 const PORT = process.env.PORT || 5003;
 

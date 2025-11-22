@@ -161,11 +161,14 @@ const sendTokenResponse = (user, statusCode, res) => {
       Date.now() + process.env.JWT_COOKIE_EXPIRE * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
+    sameSite: "lax",
   };
 
   if (process.env.NODE_ENV === "production") {
     options.secure = true; // ใช้ cookie secure ถ้าเป็น production (HTTPS เท่านั้น)
   }
+
+  res.cookie("token", token, options);
 
   res.status(statusCode).json({
     success: true,
@@ -193,10 +196,17 @@ exports.getMe = async (req, res, next) => {
 //@route   GET /api/v1/auth/logout
 //@access  Private
 exports.logout = async (req, res, next) => {
-  res.cookie('token', 'none', {
+  const options = {
     expires: new Date(Date.now() + 10 * 1000),
-    httpOnly: true
-  });
+    httpOnly: true,
+    sameSite: "lax",
+  };
+
+  if (process.env.NODE_ENV === "production") {
+    options.secure = true;
+  }
+
+  res.cookie("token", "none", options);
 
   res.status(200).json({
     success: true,
